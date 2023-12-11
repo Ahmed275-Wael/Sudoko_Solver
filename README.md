@@ -28,5 +28,3 @@ The only requirement is to have python 3.4 or later. Then:
 </p>
 <br><br>
 
-
-If you have any question feel free to contact me at [stevensalazarmolina@gmail.com](mailto:stevensalazarmolina@gmail.com) or open an Issue in this repository.
