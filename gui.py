@@ -1,17 +1,17 @@
 from tkinter import *
 from timeit import default_timer as timer
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import threading
 import copy
 
 from sudokucsp import SudokuCSP
-# if you want to verify that my csp.py does a better job just change
-# from csp import ... to from original import ...  , original is the csp.py file from AIMA code
 import SudokoGenarator
 from csp import backtracking_search, mrv, unordered_domain_values, forward_checking, mac, no_inference
+
+size = 9  # Size of the Sudoku board
 MARGIN = 20  # Pixels around the board
 SIDE = 50  # Width of every board cell
-WIDTH_B = HEIGHT_B = MARGIN * 2 + SIDE * 9  # Width and height of the whole board
+WIDTH_B = HEIGHT_B = MARGIN * 2 + SIDE * size  # Width and height of the whole board
 WIDTH = WIDTH_B + 180  # Width of board and buttons solve and reset
 
 
@@ -19,36 +19,28 @@ class SudokuUI(Frame):
 
     def __init__(self, parent):
         self.parent = parent
-        # we start with a blank board
-        self.original_board = [[0 for j in range(9)] for i in range(9)]
-        # ofc we should have another board in which we will show solution
+        self.original_board = [[0 for _ in range(size)] for _ in range(size)]
         self.current_board = copy.deepcopy(self.original_board)
         Frame.__init__(self, parent)
         self.row, self.col = 0, 0
         self.__initUI()
 
     def __initUI(self):
-        # we will initializate stuff that will be shown in the gui
         self.pack(fill=BOTH, expand=1)
         self.canvas = Canvas(self, width=WIDTH_B, height=HEIGHT_B)
         self.canvas.pack(fill=BOTH, side=TOP)
         self.canvas.grid(row=0, column=0, rowspan=30, columnspan=60)
 
-        # level will be used to select the lvl of the board, 1 means easy and 2 hard
         self.level = IntVar(value=1)
-        # which will be used to select which board at which lvl, there are 3 for each level
         self.which = 0
 
-        # we will need a StringVar so that the client can see the time used by an algorithm
         self.time = StringVar()
         self.time.set("Time:                    ")
-        # same for number of backtracks
         self.n_bt = StringVar()
         self.n_bt.set("N. BT:   ")
 
         self.make_menu()
 
-        # the default will be the board of lvl 1 and which 1
         self.__change_level()
 
         self.clear_button = Button(self, text="Reset", command=self.__clear_board, width=15, height=5)
@@ -87,9 +79,10 @@ class SudokuUI(Frame):
         self.__draw_grid()
         self.__draw_puzzle()
 
-    def solve_clicked(self):
+        # Bind the function to validate user input
+        self.canvas.bind("<Button-1>", self.on_cell_click)
 
-        # we are searching for a solution so it is good to disable buttons
+    def solve_clicked(self):
         for rb in self.radio:
             rb.config(state=DISABLED)
         self.clear_button.config(state=DISABLED)
@@ -100,7 +93,6 @@ class SudokuUI(Frame):
         messagebox.showinfo("Working", "We are looking for a solution, please wait some seconds ...")
 
     def solve_sudoku(self):
-
         s = SudokuCSP(self.current_board)
         inf, dv, suv = None, None, None
 
@@ -118,23 +110,19 @@ class SudokuUI(Frame):
         a = backtracking_search(s, select_unassigned_variable=suv, order_domain_values=unordered_domain_values,
                                 inference=inf)
         end = timer()
-        # if a isn't null we found a solution so we will show it in the current board
-        # if a is null then we send a message to the user that the initial board
-        # breaks some constraints
+
         if a:
-            for i in range(9):
-                for j in range(9):
-                    index = i * 9 + j
+            for i in range(size):
+                for j in range(size):
+                    index = i * size + j
                     self.current_board[i][j] = a.get("CELL" + str(index))
         else:
             messagebox.showerror("Error", "Invalid sudoku puzzle, please check the initial state")
 
-        # showing solution
         self.__draw_puzzle()
-        self.time.set("Time: "+str(round(end-start, 5))+" seconds")
-        self.n_bt.set("N. BR: "+str(s.n_bt))
+        self.time.set("Time: " + str(round(end - start, 5)) + " seconds")
+        self.n_bt.set("N. BR: " + str(s.n_bt))
 
-        # re-enabling buttons for search a new solution
         for rb in self.radio:
             rb.config(state=NORMAL)
         self.clear_button.config(state=NORMAL)
@@ -142,7 +130,6 @@ class SudokuUI(Frame):
         self.menu_bar.entryconfig("Level", state="normal")
 
     def make_menu(self):
-        # creating menu with level Easy and Hard
         self.menu_bar = Menu(self.parent)
         self.parent.configure(menu=self.menu_bar)
         level_menu = Menu(self.menu_bar, tearoff=False)
@@ -151,18 +138,14 @@ class SudokuUI(Frame):
         level_menu.add_radiobutton(label="Hard", variable=self.level, value=2, command=self.__change_level)
 
     def __change_level(self):
-        # to add a new board, you just have to change %3 to %4 and then add another
-        # clause elif like "elif self.which == 3:"
         sudoku_board = SudokoGenarator.generate_sudoku()
         num_to_remove = 40  # Adjust the number of removed elements as needed
         SudokoGenarator.remove_numbers(sudoku_board, num_to_remove)
         self.original_board = copy.deepcopy(sudoku_board)
         self.current_board = copy.deepcopy(self.original_board)
-
         self.__draw_puzzle()
 
     def __draw_grid(self):
-
         for i in range(10):
             if i % 3 == 0:
                 color = "black"
@@ -183,8 +166,8 @@ class SudokuUI(Frame):
         self.canvas.delete("numbers")
         self.time.set("Time:                  ")
         self.n_bt.set("N. BT:   ")
-        for i in range(9):
-            for j in range(9):
+        for i in range(size):
+            for j in range(size):
                 cell = self.current_board[i][j]
                 if cell != 0:
                     x = MARGIN + j * SIDE + SIDE / 2
@@ -195,9 +178,39 @@ class SudokuUI(Frame):
                         self.canvas.create_text(x, y, text=cell, tags="numbers", fill="red")
 
     def __clear_board(self):
+        sudoku_board = SudokoGenarator.generate_sudoku()
+        num_to_remove = 40  # Adjust the number of removed elements as needed
+        SudokoGenarator.remove_numbers(sudoku_board, num_to_remove)
+        self.original_board = copy.deepcopy(sudoku_board)
         self.current_board = copy.deepcopy(self.original_board)
         self.__draw_puzzle()
 
+    def on_cell_click(self, event):
+        x, y = event.x, event.y
+        col = (x - MARGIN) // SIDE
+        row = (y - MARGIN) // SIDE
+        if 0 <= row < size and 0 <= col < size:
+            self.row, self.col = row, col
+            self.canvas.focus_set()
 
+            # Get user input using a simple dialog
+            user_input = simpledialog.askinteger("Input", "Enter a number (1-9):", parent=self.parent, minvalue=1, maxvalue=9)
 
+            if user_input is not None:
+                if self.is_valid_input(user_input, row, col):
+                    self.current_board[row][col] = user_input
+                    self.__draw_puzzle()
+                else:
+                    messagebox.showerror("Invalid Input", "Invalid input in cell ({}, {}). Please try again.".format(row, col))
 
+    def is_valid_input(self, num, row, col):
+        if num in self.current_board[row] or num in [self.current_board[i][col] for i in range(size)]:
+            return False
+
+        start_row, start_col = 3 * (row // 3), 3 * (col // 3)
+        for i in range(3):
+            for j in range(3):
+                if self.current_board[start_row + i][start_col + j] == num:
+                    return False
+
+        return True

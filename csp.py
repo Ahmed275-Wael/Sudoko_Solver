@@ -56,6 +56,16 @@ class CSP:
         self.nassigns = 0
         self.n_bt = 0
 
+    def reduce_domains(self):
+        """Perform initial domain reduction based on unary constraints."""
+        for var in self.variables:
+            unary_constraints = [val for val in self.domains[var] if self.constraints(var, val, var, val)]
+            self.domains[var] = unary_constraints
+
+    def preprocess(self):
+        """Perform initial domain reduction before applying AC3."""
+        self.reduce_domains()
+
     def assign(self, var, val, assignment):
         """Add {var: val} to assignment; Discard the old value if any."""
         assignment[var] = val
@@ -128,20 +138,49 @@ class CSP:
 # ______________a________________________________________________________________
 # Constraint Propagation with AC-3
 
-def AC3(csp, queue=None, removals=None):
+def AC3(csp, queue=None, removals=None, display_tree=True):
     """[Figure 6.3]"""
     if queue is None:
         queue = [(Xi, Xk) for Xi in csp.variables for Xk in csp.neighbors[Xi]]
     csp.support_pruning()
+
+    ac3_tree = {}  # to store information about removed values and added arcs in the AC3 tree
+
+    def add_to_tree(Xi, Xj, removed_values, added_arcs):
+        if display_tree:
+            ac3_tree[(Xi, Xj)] = {'removed_values': removed_values, 'added_arcs': added_arcs}
+
     while queue:
         (Xi, Xj) = queue.pop()
+
         if revise(csp, Xi, Xj, removals):
+            removed_values = set(csp.domains[Xi]) - set(csp.curr_domains[Xi])
+            added_arcs = []
             if not csp.curr_domains[Xi]:
                 return False
             for Xk in csp.neighbors[Xi]:
                 if Xk != Xi:
                     queue.append((Xk, Xi))
+                    added_arcs.append(((Xk, Xi)))
+            add_to_tree(Xi, Xj, removed_values, added_arcs)
+            #print(queue)
+
+    if display_tree:
+        print("============================================================\n")
+        print_ac3_tree(ac3_tree)
+
     return True
+
+def print_ac3_tree(tree):
+    """Print a human-readable representation of the AC3 tree."""
+    print("AC3 Tree:")
+    for (Xi, Xj), info in tree.items():
+        removed_values = info['removed_values']
+        added_arcs = info['added_arcs']
+        print(f"{Xi} -> {Xj}: Removed {removed_values}, Queue {added_arcs}")
+        print("============================================================\n")
+
+
 
 
 def revise(csp, Xi, Xj, removals):
@@ -229,7 +268,7 @@ def forward_checking(csp, var, value, assignment, removals):
 
 def mac(csp, var, value, assignment, removals):
     """Maintain arc consistency."""
-    return AC3(csp, [(X, var) for X in csp.neighbors[var]], removals)
+    return AC3(csp, [(X, var) for X in csp.neighbors[var]], removals, True)
 
 # The search, proper
 
